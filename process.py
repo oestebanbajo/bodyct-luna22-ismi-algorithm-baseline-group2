@@ -27,6 +27,13 @@ def clip_and_scale(
     data[data < 0] = 0.0
     return data
 
+def random_flip_augmentation(
+    input_sample: np.ndarray, axis: Tuple[int, ...] = (1, 2)
+) -> np.ndarray:
+    for ax in axis:
+        if np.random.random_sample() > 0.5:
+            input_sample = np.flip(input_sample, axis=ax)
+    return input_sample
 
 class Nodule_classifier:
     def __init__(self):
@@ -130,6 +137,7 @@ class Nodule_classifier:
         # Extract the axial/coronal/sagittal center slices of the 50 mm^3 cube
         nodule_data = get_cross_slices_from_cube(volume=nodule_data)
         nodule_data = clip_and_scale(nodule_data)
+        nodule_data = random_flip_augmentation(nodule_data)
 
         malignancy = self.model_malignancy(nodule_data[None]).numpy()[0, 1]
         texture = np.argmax(self.model_nodule_type(nodule_data[None]).numpy())

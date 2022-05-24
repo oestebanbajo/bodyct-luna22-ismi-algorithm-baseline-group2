@@ -27,7 +27,6 @@ def clip_and_scale(
     data[data < 0] = 0.0
     return data
 
-
 class Nodule_classifier:
     def __init__(self):
 

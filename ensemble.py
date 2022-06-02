@@ -198,8 +198,8 @@ class Nodule_classifier:
         
         malignancy_vector = [malignancy,malignancy_densenet,malignancy_resnet]
         texture_vector = [texture,texture_densenet,texture_resnet]
-        malignancy = mean(malignancy_vector)
-        texture = mean(texture_vector)
+        malignancy = np.mean(malignancy_vector)
+        texture = np.mean(texture_vector)
 
         result = dict(
             malignancy_risk=round(float(malignancy), 3),

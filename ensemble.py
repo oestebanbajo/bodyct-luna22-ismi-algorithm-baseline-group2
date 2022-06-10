@@ -5,6 +5,9 @@ import numpy as np
 from pathlib import Path
 import json
 
+import statistics
+from statistics import mode
+
 import tensorflow.keras
 from tensorflow.keras.applications import VGG16
 
@@ -198,8 +201,8 @@ class Nodule_classifier:
         
         malignancy_vector = [malignancy,malignancy_densenet,malignancy_resnet]
         texture_vector = [texture,texture_densenet,texture_resnet]
-        malignancy = np.mean(malignancy_vector, axis = 0)
-        texture = np.mean(texture_vector, axis = 0)
+        malignancy = np.mean(malignancy_vector)
+        texture = mode(texture_vector)
 
         result = dict(
             malignancy_risk=round(float(malignancy), 3),

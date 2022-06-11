@@ -6,6 +6,8 @@ from pathlib import Path
 import json
 
 import tensorflow.keras
+import tensorflow as tf
+from tensorflow.keras import layers
 from tensorflow.keras.applications import VGG16
 
 # Enforce some Keras backend settings that we need
@@ -26,6 +28,45 @@ def clip_and_scale(
     data[data > 1] = 1.0
     data[data < 0] = 0.0
     return data
+
+def get_model(width=64, height=64, depth=64, num_classes=num_classes):
+    """
+    Build a 3D convolutional neural network model.
+    """
+    init = tf.keras.initializers.HeNormal()
+
+    inputs_ = tf.keras.Input((width, height, depth))
+    x = layers.Reshape(target_shape=(1, width, height, depth))(inputs_)
+
+    x = layers.BatchNormalization()(x)
+
+    x = layers.Conv3D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool3D(pool_size=2)(x)
+    x = layers.Conv3D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool3D(pool_size=2)(x)
+
+    x = layers.Dropout(0.3)(x)
+
+    x = layers.Conv3D(filters=64, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool3D(pool_size=2)(x)
+
+    x = layers.Dropout(0.3)(x)
+
+    x = layers.Flatten()(x)
+
+    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
+    x = layers.Dropout(0.3)(x)
+    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
+    x = layers.Dropout(0.3)(x)
+
+    outputs = layers.Dense(units=num_classes, activation="softmax", kernel_initializer=init)(x)
+
+    # Define the model.
+    model_ = tf.keras.Model(inputs_, outputs, name="3dcnn")
+    return model_
 
 class Nodule_classifier:
     def __init__(self):

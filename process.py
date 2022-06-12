@@ -29,7 +29,7 @@ def clip_and_scale(
     data[data < 0] = 0.0
     return data
 
-def get_model(width=64, height=64, depth=64, num_classes=num_classes):
+def get_model(width=64, height=64, depth=64, num_classes=None):
     """
     Build a 3D convolutional neural network model.
     """

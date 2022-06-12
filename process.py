@@ -186,7 +186,7 @@ class Nodule_classifier:
         )
 
         # Extract the axial/coronal/sagittal center slices of the 50 mm^3 cube
-        nodule_data = get_cross_slices_from_cube(volume=nodule_data)
+        #nodule_data = get_cross_slices_from_cube(volume=nodule_data)
         nodule_data = clip_and_scale(nodule_data)
 
         malignancy = self.model_malignancy(nodule_data[None]).numpy()[0, 1]

@@ -5,9 +5,10 @@ import numpy as np
 from pathlib import Path
 import json
 
+import statistics
+from statistics import mode
+
 import tensorflow.keras
-import tensorflow as tf
-from tensorflow.keras import layers
 from tensorflow.keras.applications import VGG16
 
 # Enforce some Keras backend settings that we need
@@ -28,45 +29,6 @@ def clip_and_scale(
     data[data > 1] = 1.0
     data[data < 0] = 0.0
     return data
-
-def get_model(width=64, height=64, depth=64, num_classes=num_classes):
-    """
-    Build a 3D convolutional neural network model.
-    """
-    init = tf.keras.initializers.HeNormal()
-
-    inputs_ = tf.keras.Input((width, height, depth))
-    x = layers.Reshape(target_shape=(1, width, height, depth))(inputs_)
-
-    x = layers.BatchNormalization()(x)
-
-    x = layers.Conv3D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPool3D(pool_size=2)(x)
-    x = layers.Conv3D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPool3D(pool_size=2)(x)
-
-    x = layers.Dropout(0.3)(x)
-
-    x = layers.Conv3D(filters=64, kernel_size=3, activation="relu", kernel_initializer=init)(x)
-    x = layers.BatchNormalization()(x)
-    x = layers.MaxPool3D(pool_size=2)(x)
-
-    x = layers.Dropout(0.3)(x)
-
-    x = layers.Flatten()(x)
-
-    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
-    x = layers.Dropout(0.3)(x)
-    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
-    x = layers.Dropout(0.3)(x)
-
-    outputs = layers.Dense(units=num_classes, activation="softmax", kernel_initializer=init)(x)
-
-    # Define the model.
-    model_ = tf.keras.Model(inputs_, outputs, name="3dcnn")
-    return model_
 
 class Nodule_classifier:
     def __init__(self):
@@ -89,6 +51,36 @@ class Nodule_classifier:
             by_name=True,
             skip_mismatch=True,
         )
+        
+        self.model_densenet_malignancy = tf.keras.applications.densenet.DenseNet201(
+            include_top=True,
+            weights='imagenet',
+            input_tensor=None,
+            input_shape=None,
+            pooling=None,
+            classes=num_classes, classifier_activation='softmax',
+        )
+        self.model_densenet_malignancy.load_weights(
+            "/opt/algorithm/models/densenet_malignancy_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )
+        
+        self.model_resnet_malignancy = tf.keras.applications.resnet50.ResNet50(
+            include_top=True,
+            weights=None,
+            input_tensor=None,
+            input_shape=None,
+            pooling=None,
+            classes=num_classes,
+            classifier_activation="softmax"),
+        )
+        self.model_resnet_malignancy.load_weights(
+            "/opt/algorithm/models/resnet_malignancy_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )
+
 
         # load texture model
         self.model_nodule_type = VGG16(
@@ -102,6 +94,35 @@ class Nodule_classifier:
         )
         self.model_nodule_type.load_weights(
             "/opt/algorithm/models/vgg16_noduletype_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )
+        
+        self.model_resnet_nodule_type = tf.keras.applications.resnet50.ResNet50(
+            include_top=True,
+            weights=None,
+            input_tensor=None,
+            input_shape=None,
+            pooling=None,
+            classes=num_classes,
+            classifier_activation="softmax",
+        )
+        self.model_resnet_nodule_type.load_weights(
+            "/opt/algorithm/models/resnet_noduletype_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )
+        
+        self.model_densenet_nodule_type = tf.keras.applications.densenet.DenseNet201(
+            include_top=True,
+            weights='imagenet',
+            input_tensor=None,
+            input_shape=None,
+            pooling=None,
+            classes=num_classes, classifier_activation='softmax',
+        )
+        self.model_densenet_nodule_type.load_weights(
+            "/opt/algorithm/models/densenet_noduletype_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )
@@ -173,6 +194,15 @@ class Nodule_classifier:
 
         malignancy = self.model_malignancy(nodule_data[None]).numpy()[0, 1]
         texture = np.argmax(self.model_nodule_type(nodule_data[None]).numpy())
+        malignancy_densenet = self.model_densenet_malignancy(nodule_data[None]).numpy()[0, 1]
+        texture_densenet = np.argmax(self.model_densenet_nodule_type(nodule_data[None]).numpy())
+        malignancy_resnet = self.model_resnet_malignancy(nodule_data[None]).numpy()[0, 1]
+        texture_resnet = np.argmax(self.model_resnet_nodule_type(nodule_data[None]).numpy())
+        
+        malignancy_vector = [malignancy,malignancy_densenet,malignancy_resnet]
+        texture_vector = [texture,texture_densenet,texture_resnet]
+        malignancy = np.mean(malignancy_vector)
+        texture = mode(texture_vector)
 
         result = dict(
             malignancy_risk=round(float(malignancy), 3),

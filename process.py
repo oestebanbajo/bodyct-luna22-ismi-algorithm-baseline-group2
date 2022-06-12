@@ -71,9 +71,9 @@ def get_model(width=64, height=64, depth=64, num_classes=num_classes):
 class Nodule_classifier:
     def __init__(self):
 
-        self.input_size = 224
-        self.input_spacing = 0.2
-
+        self.input_size = 64
+        self.input_spacing = 0.6
+        '''
         # load malignancy model
         self.model_malignancy = VGG16(
             include_top=True,
@@ -105,7 +105,25 @@ class Nodule_classifier:
             by_name=True,
             skip_mismatch=True,
         )
+        '''
+        
+        self.model_malignancy = get_model(width=64, height=64, depth=64, num_classes=2)
+        
+        self.model_malignancy.load_weights(
+            "/opt/algorithm/models/3dcnn_malignancy_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )
 
+        # load texture model
+        self.model_nodule_type = get_model(width=64, height=64, depth=64, num_classes=3)
+        
+        self.model_nodule_type.load_weights(
+            "/opt/algorithm/models/3dcnn_noduletype_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )        
+        
         print("Models initialized")
 
     def load_image(self) -> SimpleITK.Image:

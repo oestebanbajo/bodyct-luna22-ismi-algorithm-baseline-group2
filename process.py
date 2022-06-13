@@ -68,11 +68,63 @@ def get_model(width=64, height=64, depth=64, num_classes=None):
     model_ = tf.keras.Model(inputs_, outputs, name="3dcnn")
     return model_
 
+def get_model_2d(width=224, height=224, depth = 3, num_classes=num_classes):
+    """
+    Build a 2D convolutional neural network model.
+    """
+    init = tf.keras.initializers.HeNormal()
+
+    inputs_ = tf.keras.Input((depth, width, height))
+    #x = layers.Reshape(target_shape=(width, height, depth))(inputs_)
+
+    x = layers.BatchNormalization()(inputs_)
+
+    x = layers.Conv2D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+
+    x = layers.MaxPool2D(pool_size=2)(x)
+    x = layers.Conv2D(filters=32, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=2)(x)
+
+    x = layers.Dropout(0.3)(x)
+
+    x = layers.Conv2D(filters=64, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=2)(x)
+    x = layers.Conv2D(filters=64, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=2)(x)
+
+    x = layers.Dropout(0.3)(x)
+
+    x = layers.Conv2D(filters=128, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=2)(x)
+    x = layers.Conv2D(filters=128, kernel_size=3, activation="relu", kernel_initializer=init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D(pool_size=2)(x)
+
+    x = layers.Dropout(0.3)(x)
+
+    x = layers.Flatten()(x)
+
+    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
+    x = layers.Dropout(0.3)(x)
+    x = layers.Dense(units=512, activation="relu", kernel_initializer=init)(x)
+    x = layers.Dropout(0.3)(x)
+
+    outputs = layers.Dense(units=num_classes, activation="softmax", kernel_initializer=init)(x)
+
+    # Define the model.
+    model_ = tf.keras.Model(inputs_, outputs, name="2dcnn")
+    return model_
+
 class Nodule_classifier:
     def __init__(self):
 
-        self.input_size = 64
-        self.input_spacing = 0.6
+        self.input_size = 224
+        self.input_spacing = 0.2
         '''
         # load malignancy model
         self.model_malignancy = VGG16(
@@ -107,19 +159,19 @@ class Nodule_classifier:
         )
         '''
         
-        self.model_malignancy = get_model(width=64, height=64, depth=64, num_classes=2)
+        self.model_malignancy = get_model_2d(width=224, height=224, depth=3, num_classes=2)
         
         self.model_malignancy.load_weights(
-            "/opt/algorithm/models/3dcnn_malignancy_best_val_accuracy.h5",
+            "/opt/algorithm/models/2dcnn_norotation_malignancy_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )
 
         # load texture model
-        self.model_nodule_type = get_model(width=64, height=64, depth=64, num_classes=3)
+        self.model_nodule_type = get_model_2d(width=224, height=224, depth=3, num_classes=3)
         
         self.model_nodule_type.load_weights(
-            "/opt/algorithm/models/3dcnn_noduletype_best_val_accuracy.h5",
+            "/opt/algorithm/models/2dcnn_noduletype_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )        
@@ -186,7 +238,7 @@ class Nodule_classifier:
         )
 
         # Extract the axial/coronal/sagittal center slices of the 50 mm^3 cube
-        #nodule_data = get_cross_slices_from_cube(volume=nodule_data)
+        nodule_data = get_cross_slices_from_cube(volume=nodule_data)
         nodule_data = clip_and_scale(nodule_data)
 
         malignancy = self.model_malignancy(nodule_data[None]).numpy()[0, 1]

@@ -4,12 +4,10 @@ import SimpleITK
 import numpy as np
 from pathlib import Path
 import json
-from typing import List
-
-import statistics
-from statistics import mode
 
 import tensorflow.keras
+import tensorflow as tf
+from tensorflow.keras import layers
 from tensorflow.keras.applications import VGG16
 
 # Enforce some Keras backend settings that we need
@@ -31,7 +29,7 @@ def clip_and_scale(
     data[data < 0] = 0.0
     return data
 
-def get_model_3d(width, height, depth, num_classes):
+def get_model(width=64, height=64, depth=64, num_classes=None):
     """
     Build a 3D convolutional neural network model.
     """
@@ -70,7 +68,7 @@ def get_model_3d(width, height, depth, num_classes):
     model_ = tf.keras.Model(inputs_, outputs, name="3dcnn")
     return model_
 
-def get_model_2d(width, height, depth, num_classes):
+def get_model_2d(width=224, height=224, depth = 3, num_classes=num_classes):
     """
     Build a 2D convolutional neural network model.
     """
@@ -125,14 +123,11 @@ def get_model_2d(width, height, depth, num_classes):
 class Nodule_classifier:
     def __init__(self):
 
-        self.input_size_2d = 224
-        self.input_spacing_2d = 0.2
-        
-        self.input_size_3d = 64
-        self.input_spacing_2d = 0.6
-
-        # load malignancy models
-        self.model_malignancy_vgg16 = VGG16(
+        self.input_size = 224
+        self.input_spacing = 0.2
+        '''
+        # load malignancy model
+        self.model_malignancy = VGG16(
             include_top=True,
             weights=None,
             input_tensor=None,
@@ -141,29 +136,14 @@ class Nodule_classifier:
             classes=2,
             classifier_activation="softmax",
         )
-        self.model_malignancy_vgg16.load_weights(
+        self.model_malignancy.load_weights(
             "/opt/algorithm/models/vgg16_malignancy_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )
-        
-        self.model_malignancy_2d = get_model_2d(width=224, height=224, depth=3, num_classes=2)
-        self.model_malignancy_2d.load_weights(
-            "/opt/algorithm/models/2dcnn_norotation_malignancy_best_val_accuracy.h5",
-            by_name=True,
-            skip_mismatch=True,
-        )
-        
-        self.model_malignancy_3d = get_model_3d(width=64, height=64, depth=64, num_classes=2)
-        self.model_malignancy_3d.load_weights(
-            "/opt/algorithm/models/3dcnn_norotation_malignancy_best_val_accuracy.h5",
-            by_name=True,
-            skip_mismatch=True,
-        )
 
-
-        # load texture models
-        self.model_nodule_type_vgg16 = VGG16(
+        # load texture model
+        self.model_nodule_type = VGG16(
             include_top=True,
             weights=None,
             input_tensor=None,
@@ -172,26 +152,30 @@ class Nodule_classifier:
             classes=3,
             classifier_activation="softmax",
         )
-        self.model_nodule_type_vgg16.load_weights(
+        self.model_nodule_type.load_weights(
             "/opt/algorithm/models/vgg16_noduletype_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )
+        '''
         
-        self.model_nodule_type_2d = get_model_2d(width=224, height=224, depth=3, num_classes=3)
-        self.model_nodule_type_2d.load_weights(
-            "/opt/algorithm/models/2dcnn_noduletype_best_val_accuracy.h5",
-            by_name=True,
-            skip_mismatch=True,
-        )
+        self.model_malignancy = get_model_2d(width=224, height=224, depth=3, num_classes=2)
         
-        self.model_nodule_type_3d = get_model_3d(width=64, height=64, depth=64, num_classes=3)
-        self.model_nodule_type_3d.load_weights(
-            "/opt/algorithm/models/3dcnn_noduletype_best_val_accuracy.h5",
+        self.model_malignancy.load_weights(
+            "/opt/algorithm/models/2dcnn_norotation_malignancy_best_val_accuracy.h5",
             by_name=True,
             skip_mismatch=True,
         )
 
+        # load texture model
+        self.model_nodule_type = get_model_2d(width=224, height=224, depth=3, num_classes=3)
+        
+        self.model_nodule_type.load_weights(
+            "/opt/algorithm/models/2dcnn_noduletype_best_val_accuracy.h5",
+            by_name=True,
+            skip_mismatch=True,
+        )        
+        
         print("Models initialized")
 
     def load_image(self) -> SimpleITK.Image:
@@ -204,85 +188,49 @@ class Nodule_classifier:
     def preprocess(
         self,
         img: SimpleITK.Image,
-    ) -> List[SimpleITK.Image]:
+    ) -> SimpleITK.Image:
 
         # Resample image
         original_spacing_mm = img.GetSpacing()
         original_size = img.GetSize()
-        
-        new_spacing_2d = (self.input_spacing_2d, self.input_spacing_2d, self.input_spacing_2d)
-        new_size_2d = [
+        new_spacing = (self.input_spacing, self.input_spacing, self.input_spacing)
+        new_size = [
             int(round(osz * ospc / nspc))
             for osz, ospc, nspc in zip(
                 original_size,
                 original_spacing_mm,
-                new_spacing_2d,
+                new_spacing,
             )
         ]
-        resampled_img_2d = SimpleITK.Resample(
+        resampled_img = SimpleITK.Resample(
             img,
-            new_size_2d,
+            new_size,
             SimpleITK.Transform(),
             SimpleITK.sitkLinear,
             img.GetOrigin(),
-            new_spacing_2d,
-            img.GetDirection(),
-            0,
-            img.GetPixelID(),
-        )
-        
-        new_spacing_3d = (self.input_spacing_3d, self.input_spacing_3d, self.input_spacing_3d)
-        new_size_3d = [
-            int(round(osz * ospc / nspc))
-            for osz, ospc, nspc in zip(
-                original_size,
-                original_spacing_mm,
-                new_spacing_3d,
-            )
-        ]
-        resampled_img_3d = SimpleITK.Resample(
-            img,
-            new_size_3d,
-            SimpleITK.Transform(),
-            SimpleITK.sitkLinear,
-            img.GetOrigin(),
-            new_spacing_3d,
+            new_spacing,
             img.GetDirection(),
             0,
             img.GetPixelID(),
         )
 
         # Return image data as a numpy array
-        return [SimpleITK.GetArrayFromImage(resampled_img_2d), SimpleITK.GetArrayFromImage(resampled_img_3d)]
+        return SimpleITK.GetArrayFromImage(resampled_img)
 
     def predict(self, input_image: SimpleITK.Image) -> Dict:
 
         print(f"Processing image of size: {input_image.GetSize()}")
 
-        nodule_data_2d = self.preprocess(input_image)[0]
-        nodule_data_3d = self.preprocess(input_image)[1]
+        nodule_data = self.preprocess(input_image)
 
         # Crop a volume of 50 mm^3 around the nodule
-        nodule_data_2d = center_crop_volume(
-            volume=nodule_data_2d,
+        nodule_data = center_crop_volume(
+            volume=nodule_data,
             crop_size=np.array(
                 (
-                    self.input_size_2d,
-                    self.input_size_2d,
-                    self.input_size_2d,
-                )
-            ),
-            pad_if_too_small=True,
-            pad_value=-1024,
-        )
-        
-        nodule_data_3d = center_crop_volume(
-            volume=nodule_data_3d,
-            crop_size=np.array(
-                (
-                    self.input_size_3d,
-                    self.input_size_3d,
-                    self.input_size_3d,
+                    self.input_size,
+                    self.input_size,
+                    self.input_size,
                 )
             ),
             pad_if_too_small=True,
@@ -290,22 +238,11 @@ class Nodule_classifier:
         )
 
         # Extract the axial/coronal/sagittal center slices of the 50 mm^3 cube
-        nodule_data_2d = get_cross_slices_from_cube(volume=nodule_data_2d)
-        nodule_data_2d = clip_and_scale(nodule_data_2d)
-        
-        nodule_data_3d = clip_and_scale(nodule_data_3d)
+        nodule_data = get_cross_slices_from_cube(volume=nodule_data)
+        nodule_data = clip_and_scale(nodule_data)
 
-        malignancy_vgg16 = self.model_malignancy_vgg16(nodule_data_2d[None]).numpy()[0, 1]
-        texture_vgg16 = np.argmax(self.model_nodule_type_vgg16(nodule_data_2d[None]).numpy())
-        malignancy_2d = self.model_malignancy_2d(nodule_data_2d[None]).numpy()[0, 1]
-        texture_2d = np.argmax(self.model_nodule_type_2d(nodule_data_2d[None]).numpy())
-        malignancy_3d = self.model_malignancy_3d(nodule_data_3d[None]).numpy()[0, 1]
-        texture_3d = np.argmax(self.model_nodule_type_3d(nodule_data_3d[None]).numpy())
-        
-        malignancy_vector = [malignancy_vgg16,malignancy_2d,malignancy_3d]
-        texture_vector = [texture_vgg16,texture_2d,texture_3d]
-        malignancy = mode(malignancy_vector)
-        texture = mode(texture_vector)
+        malignancy = self.model_malignancy(nodule_data[None]).numpy()[0, 1]
+        texture = np.argmax(self.model_nodule_type(nodule_data[None]).numpy())
 
         result = dict(
             malignancy_risk=round(float(malignancy), 3),

@@ -258,9 +258,10 @@ class Nodule_classifier:
     def predict(self, input_image: SimpleITK.Image) -> Dict:
 
         print(f"Processing image of size: {input_image.GetSize()}")
-
-        nodule_data_2d = self.preprocess(input_image)[0]
-        nodule_data_3d = self.preprocess(input_image)[1]
+        
+        nod = self.preprocess(input_image)
+        nodule_data_2d = nod[0]
+        nodule_data_3d = nod[1]
 
         # Crop a volume of 50 mm^3 around the nodule
         nodule_data_2d = center_crop_volume(

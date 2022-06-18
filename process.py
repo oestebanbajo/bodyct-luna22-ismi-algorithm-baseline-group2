@@ -10,6 +10,8 @@ import statistics
 from statistics import mode
 
 import tensorflow.keras
+import tensorflow as tf
+from tensorflow.keras import layers
 from tensorflow.keras.applications import VGG16
 
 # Enforce some Keras backend settings that we need

@@ -305,7 +305,7 @@ class Nodule_classifier:
         
         malignancy_vector = [malignancy_vgg16,malignancy_2d,malignancy_3d]
         texture_vector = [texture_vgg16,texture_2d,texture_3d] #try with (1 - texture_2d)
-        malignancy = mode(malignancy_vector)
+        malignancy = np.mean(malignancy_vector)
         texture = mode(texture_vector)
 
         result = dict(

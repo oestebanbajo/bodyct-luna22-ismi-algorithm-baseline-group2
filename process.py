@@ -131,7 +131,7 @@ class Nodule_classifier:
         self.input_spacing_2d = 0.2
         
         self.input_size_3d = 64
-        self.input_spacing_2d = 0.6
+        self.input_spacing_3d = 0.6
 
         # load malignancy models
         self.model_malignancy_vgg16 = VGG16(
